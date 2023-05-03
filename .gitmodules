@@ -1,0 +1,6 @@
+[submodule "pytorch_net"]
+	path = pytorch_net
+	url = https://github.com/tailintalent/pytorch_net.git
+[submodule "BabyARC"]
+	path = BabyARC
+	url = https://github.com/frankaging/BabyARC
