@@ -21,8 +21,7 @@ AGGR_TASK_CACHE = "cache"
 EXAMPLES_PER_TASK = 6
 
 def aggregate_tasks(dataset, dataset_fname=None, seen_graphs=None, max_count=None):
-    # dataset[0][x][3]['obj_spec_core']
-    # all the same for x
+    """Preprocesses the dataset to aggregate tasks with the same graph."""
     def process_rel(rel):
         ids = rel[0]
         new_ids = (int(ids[0][4:]), int(ids[1][4:]))
@@ -127,11 +126,11 @@ def aggregate_tasks(dataset, dataset_fname=None, seen_graphs=None, max_count=Non
     return dataset, torch.LongTensor(task_ids), seen_graphs, taskId2RelId, relName2Id, example_idx, ds_stats
 
 def create_collate_fn(relName2Id, num_augs, padding_objs, augmentation=True, shuffle_masks=True):
-    # Store the taskID 2 rel mapping
+    """Creates a collate function for the dataset."""
    
     triu_indices = torch.triu_indices(padding_objs, padding_objs, offset=1)
     rows, cols = (triu_indices[0].tolist(), triu_indices[1].tolist())
-    rc_shuffle_idx = {} # determines the idx of original "edge location" after shuffling
+    rc_shuffle_idx = {} # Determines the idx of original "edge location" after shuffling.
     for idx, (r, c) in enumerate(zip(rows, cols)):
         rc_shuffle_idx[(r, c)] = idx
         rc_shuffle_idx[(c, r)] = idx
@@ -146,7 +145,6 @@ def create_collate_fn(relName2Id, num_augs, padding_objs, augmentation=True, shu
         example_ids = []
         shuffle_rel_idx = []
         
-        # masked_img_embed_neg_lst = []
         for batch_id, task in enumerate(batch):
             task_id = task[0][3]['task_id']
             for batch_ex_id, example in enumerate(task):
@@ -177,7 +175,6 @@ def create_collate_fn(relName2Id, num_augs, padding_objs, augmentation=True, shu
                 img = example[0][0][None] # [1 x num_color x w x h]
                 
                 objs_mask.append([1] * num_obj + [0] * num_pads)
-                # edge_mask.append(get_valid_edges(num_pads)) #Sanity check
                 
                 gt_edge.append(torch.LongTensor(relIds))
                 task_ids.append(task_id)
@@ -225,12 +222,17 @@ def create_collate_fn(relName2Id, num_augs, padding_objs, augmentation=True, shu
         objs_mask_rand_pt = objs_mask_pt.flatten(0, 1)[mask_img_embeds_rand_perm].view(objs_mask_pt.shape)
         edge_mask_rand_pt = torch.bitwise_and(objs_mask_rand_pt[:, rows], objs_mask_rand_pt[:, cols])
 
-        # mask_img : BS * 6, num_pad_objs, w, h
-        # mask_img_augs : BS * 6, num_augs, num_pad_objs, w, h
-        # mask_img_neg : BS * 6, num_neg, num_pad_objs, w, h
-        # gt_edge : BS * 6, 3 - where 3 is GT shuffled relation of each edge in TRIU
-        # GCN_mask : BS * 6, 3 - where each 3 is 1,1,1 or 1,0,0 depending on 3 obj (3 rel) or 2 obj (1 rel)
-        # task_ids : BS * 6 of each task_id of each example
+        # Return value information:
+        # mask_img : [BS * 6, num_pad_objs, w, h] - masked images with padded objects
+        # mask_img_augs : [BS * 6, num_augs, num_pad_objs, w, h] - augmented masked images with padded objects
+        # mask_img_neg : [BS * 6, num_neg, num_pad_objs, w, h] - negative examples with padded objects
+        # gt_edge : [BS * 6, 3] - ground truth shuffled relation of each edge in the upper triangle
+        # edge_mask : [BS * 6, 3] - binary mask indicating valid edges (1 for valid, 0 for invalid)
+        # task_ids : [BS * 6] - task IDs for each example
+        # ex_ids : [BS * 6] - example IDs for each example
+        # shuf_rel_idx : [BS * 6, 3] - shuffled relation indices for each edge in the upper triangle
+        # edge_mask_neg : [BS * 6, 3] - binary mask for negative examples
+
         return dict(
             mask_img=mask_img_embeds_pt,
             mask_img_augs=mask_img_aug_embeds_pt,
@@ -246,6 +248,7 @@ def create_collate_fn(relName2Id, num_augs, padding_objs, augmentation=True, shu
 
 
 def get_dataloader(args):
+    """Returns the dataloader for the task."""
     dataset_train, dataset_val, train_fname, val_fname = get_task_dataset(args)
     dataset_train, task_ids, seen_graphs, taskId2RelId, relName2Id, total_tr_examples, ds_stats = aggregate_tasks(dataset_train, train_fname, max_count=args.max_count)
     
@@ -283,6 +286,7 @@ def get_dataloader(args):
 
 
 def get_task_dataset(args):
+    """Returns the dataset for the task."""
     # BabyARC-relation dataset:
     obj3_str = "+3ai+3a+3b" if args.num_objs >= 3 else ""
     obj4_str = "+4a+4ai+4b" if args.num_objs >= 4 else ""

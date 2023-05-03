@@ -2,9 +2,10 @@ import os
 from easydict import EasyDict as edict
 import argparse
 import yaml
-import ipdb
 
-def get_default_args():
+def get_default_args() -> argparse.Namespace:
+    """Returns a dictionary of default arguments."""
+    
     args = edict()
 
     args.base_log = "/dfs/user/dzeng/virel_results"
@@ -85,20 +86,21 @@ def get_default_args():
 
     return args
 
-def open_yaml(args, config_file):
+def open_yaml(args: argparse.Namespace, config_file: str) -> argparse.Namespace:
+    """Opens a yaml file and updates the args object."""
     args = edict(args)
     with open(config_file, "rb") as f:
         yaml_config = yaml.safe_load(f)
         args.update(yaml_config)
     return args
 
-def write_yaml(args, config_file):
+def write_yaml(args: argparse.Namespace, config_file: str):
+    """Writes the args object to a yaml file."""
     with open(config_file, "w") as f:
-        # print(os.path.abspath(config_file))
-        # print(f"Written {config_file}")
         yaml.dump(args, f)
 
-def validate_args(args, warn_def_args=True):
+def validate_args(args: argparse.Namespace, warn_def_args: bool = True):
+    """Checks if args contains all the keys in get_default_args()"""
     def_args = get_default_args()
     extra_args = args.keys() - def_args.keys()
     extra_def_args = def_args.keys() - args.keys()
@@ -108,14 +110,15 @@ def validate_args(args, warn_def_args=True):
     if warn_def_args and extra_def_args:
         print(f"Keys not specified in args: {extra_def_args}")
 
-def update_with_default(args):
+def update_with_default(args: argparse.Namespace) -> argparse.Namespace:
     def_args = get_default_args()
     for k in (def_args.keys() - args.keys()):
         args[k] = def_args[k]
     return args
 
 
-def standardize_args(args):
+def standardize_args(args: argparse.Namespace) -> argparse.Namespace:
+    """Standardizes args to be compatible with each other."""
     if not args.is_lookup_mask:
         args.alpha_entr = 0
 
@@ -141,7 +144,7 @@ def standardize_args(args):
 
     return args
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     """Parse CLI arguments.
     https://sungwookyoo.github.io/tips/ArgParser/
     """
@@ -168,7 +171,8 @@ def parse_args():
 
     return args
 
-def get_args(args):
+def get_args(args: argparse.Namespace = None) -> argparse.Namespace:
+    """Returns a dictionary of arguments."""
     if args is None:
         args = parse_args()
     else:

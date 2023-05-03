@@ -38,6 +38,7 @@ from kmeans import kmeans_with_initial_prototypes, kmeans, find_nearest_prototyp
 from util import *
 
 def fine_tune_main(train_loader_edge, val_loader_edge, model, log_dir, args, device):
+    """Fine-tune the model on the edge embeddings."""
     if args.load_embeddings:
         # Extract edge embeddings and save to disk
         # Alterantively 
@@ -67,15 +68,3 @@ def fine_tune_main(train_loader_edge, val_loader_edge, model, log_dir, args, dev
     data_record = None
     for epoch in range(start_epoch, args.num_ft_epochs):
         linear_train(train_loader_edge, train_edges, linear, loss_fn, optimizer, epoch, start_step, writer, data_record, args, device)
-
-def extract_embeddings(loader_edge, model, args, device):
-    # Loop through dataloader, save forward results into a tensor 
-    pass
-
-def linear_train(loader, model, loss_fn, optimizer, epoch, start_step, writer, data_record, args, device):
-    
-    pass
-
-
-
-# Create loader from extracted embeddings

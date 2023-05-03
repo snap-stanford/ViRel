@@ -9,7 +9,6 @@ import os
 import sys
 import pickle
 import pprint as pp
-import random
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 logging.getLogger('matplotlib.font_manager').disabled = True
@@ -43,6 +42,7 @@ import networkx.algorithms.isomorphism as iso
 p = Printer()
 
 def printTaskId2edgeDist(taskId2edgeDist):
+    """Print the edge distribution for each task."""
     prnt_str = ""
     for taskId, edgeDist in enumerate(taskId2edgeDist):
         prnt_str += f"Task {taskId}  \n"
@@ -55,6 +55,7 @@ def printTaskId2edgeDist(taskId2edgeDist):
     return prnt_str
 
 def main(args=None, dataloaders=None):
+    """Main function for training and evaluating the model."""
     print(f"Using {torch.cuda.device_count()} GPUs")
 
     args = get_args(args)
@@ -150,6 +151,7 @@ def main(args=None, dataloaders=None):
 
 
 def train(loader, model, loss_fn, optimizer, epoch, start_step, writer, data_record, args, device):
+    """Train the model for one epoch."""
     total_sum = acc_sum = loss_sum = 0
     start_time = time.time()
     model.train()
@@ -204,6 +206,7 @@ def train(loader, model, loss_fn, optimizer, epoch, start_step, writer, data_rec
     return i + 1, loss_sum/total_sum, 0, time.time() - start_time
 
 def validate(loader, model, loss_fn, epoch, start_step, writer, data_record, args, device):
+    """Validate the model on the validation set."""
     model.eval()
     start_time = time.time()
     
@@ -258,6 +261,7 @@ def compute_best_config(edge_configs, relId2edgeDist):
     return best_config
 
 def evaluate(val_loader, train_loader_edge, val_loader_edge, edge_configs, model, task_loss_fn, epoch, start_step, writer, data_record, args, device, padding_objs, total_tasks, protos=None):
+    """Evaluate the model on the validation set."""
     val_dur = validate(val_loader, model, task_loss_fn, epoch, start_step, writer, data_record, args, device)
     relTaskDistTr, taskDistTr, relDistTr, protos, labelsTr, edgeMaskTr, taskIdsTr = edge_dist_fast(train_loader_edge, model, args, device, False, protos=protos)
     relTaskDistVal, taskDistVal, relDistAll, _, labelsVal, edgeMaskVal, taskIdsVal = edge_dist_fast(val_loader_edge, model, args, device, False, relDistTr, protos)
@@ -283,8 +287,7 @@ def evaluate(val_loader, train_loader_edge, val_loader_edge, edge_configs, model
     return val_dur, protos, accTr, accVal, taskAccTr, taskAccVal, edgeDistTrStr, edgeDistValStr
 
 def g_helper(g_lst, return_lst=False):
-    # g_dict = {k : v for k, v in g_lst if type(k) is tuple}
-    # g_dict.update({tuple(reversed(k)) : v for k, v in g_lst if type(k) is tuple})
+    """Helper function to convert g_lst to nx graph"""
     g_lg = to_line_graph(g_lst)
     g = get_nx_graph(g_lg, is_directed=False)
     
@@ -293,11 +296,10 @@ def g_helper(g_lst, return_lst=False):
     return g
 
 def get_mcs(g1_inpt, g2_inpt, convert_g1=True, convert_g2=True):
-    # convert g1, g2 to nx graph
+    """Get the Maximum Common Subgraph (MCS) between two graphs"""
     g1_lst, g1 = g_helper(g1_inpt, True) if convert_g1 else g1_inpt
     g2_lst, g2 = g_helper(g2_inpt, True) if convert_g2 else g2_inpt
     
-    # draw_nx_graph(g1)
     def node_match(node_dict1, node_dict2):
         return node_dict1["type"] == node_dict2["type"]
 
@@ -305,26 +307,6 @@ def get_mcs(g1_inpt, g2_inpt, convert_g1=True, convert_g2=True):
     mcs_base = list(ismags.largest_common_subgraph(symmetry=False))
     mcs = [g for g in mcs_base if len(g) > 1]
 
-    if False:
-        # Now filter by edges having the same type
-        # Actually with edge match, should't need to
-        mcs = []
-        for mcs_g in mcs_base:
-            match = True
-            for n1, n1m in mcs_g.items():
-                for n2, n2m in mcs_g.items():
-                    if n2 <= n1:
-                        continue
-                    if g1_dict[(n1, n2)] != g2_dict[(n1m, n2m)]:
-                        match = False
-                        break
-                if not match:
-                    break
-            if match:
-                mcs.append(mcs_g)
-    
-    # return the mcs.. in list or nx.graph form?
-    # why not just return all, and figure later
     if len(mcs) == 0:
         # Due to imperfect prediction, sometimes may not have an MCS
         return None
@@ -336,7 +318,6 @@ def get_mcs(g1_inpt, g2_inpt, convert_g1=True, convert_g2=True):
         g_lst_smaller = g2_lst
         g_mcs = g2.subgraph(list(mcs[0].values()))
 
-    # mcs_lst = nx_to_graph(g_mcs)
     g_lst_node_dct = {node[0] : node[1] for node in g_lst_smaller if type(node[0]) is str and node[0] in g_mcs}
     mcs_lst = []
     for item in g_lst_smaller:
@@ -344,18 +325,12 @@ def get_mcs(g1_inpt, g2_inpt, convert_g1=True, convert_g2=True):
             if item[0][0] in g_lst_node_dct and item[0][1] in g_lst_node_dct:
                 mcs_lst.append(item)
     mcs_lst += list(g_lst_node_dct.items())
-    
-    # for n1, _ in mcs[0].items(): # just need to take the first item
-    #     mcs_lst.append([n1, ''])
-    #     for n2, _ in mcs[0].items():
-    #         if n2 <= n1:
-    #             continue
-    #         mcs_lst.append([(n1, n2), g1_dict[(n1, n2)]])
-    # g_mcs, g_mcs_dict = g_helper(mcs_lst)
+
     return mcs_lst, g_mcs
 
 
 def get_group_mcs(tid_buffer, tid=None):
+    """Get the MCS for a group of graphs"""
     mcs_lst = tid_buffer[0]
     mcs_lg, g_mcs = g_helper(mcs_lst, True)
     if tid == 2:
@@ -368,12 +343,13 @@ def get_group_mcs(tid_buffer, tid=None):
 
 
 def compute_mcs(graphs, task_ids, total_tasks):
+    """Compute the MCS for each task"""
     task_ids = task_ids.tolist()
     task_graph_buffer = [[] for _ in range(total_tasks)]
     task_graph_step1 = [[] for _ in range(total_tasks)]
     task_graph_stats = [[] for _ in range(total_tasks)]
 
-    GROUP_SIZE = 5 #8640 is divisible by 15
+    GROUP_SIZE = 5
     t1 = time.time()
     for graph, task_id in tqdm(zip(graphs, task_ids)):
         tid_buffer = task_graph_buffer[task_id]
@@ -391,7 +367,7 @@ def compute_mcs(graphs, task_ids, total_tasks):
             task_graph_step1[task_id].append(group_mcs)
             tid_buffer.clear()
 
-    print("subgroup mcs", time.time() - t1)
+    print("Subgroup MCS time", time.time() - t1)
     t1 = time.time()
 
     
@@ -409,8 +385,7 @@ def compute_mcs(graphs, task_ids, total_tasks):
             if not seen:
                 tid_stats.append([mcs_lst, g_mcs, 1])
     
-    print("iso count", time.time() - t1)
-
+    print("Isomorphism count", time.time() - t1)
 
     top_n = 3
     print("Group size:", GROUP_SIZE)
@@ -422,6 +397,7 @@ def compute_mcs(graphs, task_ids, total_tasks):
     return task_graph_stats
 
 def pretty_print_stat(stat):
+    """Pretty print the MCS"""
     stat_str = ""
     for elem in stat:
         if type(elem[0]) is int:
@@ -431,6 +407,7 @@ def pretty_print_stat(stat):
     return stat_str[:-2]
 
 def from_line_graph(lg):
+    """Convert the line graph to the original graph"""
     g_lst = []
     max_id = 0
     for item in lg:
@@ -443,6 +420,7 @@ def from_line_graph(lg):
     return g_lst
 
 def compute_graphs(labels, edge_masks, padding_objs):
+    """Compute the graphs from the edge masks and labels"""
     triu_indices = torch.triu_indices(padding_objs, padding_objs, offset=1)
     rows, cols = (triu_indices[0].tolist(), triu_indices[1].tolist())
     edge_masks = edge_masks.cpu().numpy()
@@ -476,6 +454,7 @@ def compute_graphs(labels, edge_masks, padding_objs):
     return graphs
 
 def edge_dist_fast(loader, model, args, device, bw_01, relId2edgeDist=None, protos=None):
+    """Compute the edge distance for each task"""
     model.eval()
     start_time = time.time()
     
@@ -486,7 +465,6 @@ def edge_dist_fast(loader, model, args, device, bw_01, relId2edgeDist=None, prot
         relId2edgeDist = [ddict(int) for _ in range(numRels + 1)]
 
     lazy_edges = torch.eye(3, device=device, dtype=torch.int32)
-    # lazy_edges = torch.cat([torch.zeros(1, 3, device=device, dtype=torch.int32), lazy_edges], dim=0)
 
     with torch.no_grad():
         for i, x in enumerate(loader):
@@ -499,7 +477,6 @@ def edge_dist_fast(loader, model, args, device, bw_01, relId2edgeDist=None, prot
             edge = out['edge']
             
             if edge.size(-1) > 3:
-                # prototypes = model.module.obj2rel_enc.dist_prior.mean_list.data.squeeze(0).T
                 if protos is None:
                     num_protos = args.num_rels
                     labels, protos = kmeans(edge[edge_mask.bool()], iterations=15, num_protos=num_protos, return_proto=True)
@@ -508,15 +485,13 @@ def edge_dist_fast(loader, model, args, device, bw_01, relId2edgeDist=None, prot
                     labels, protos = kmeans_with_initial_prototypes(edge[edge_mask.bool()], protos, iterations=10, num_protos=num_protos, return_proto=True)
                     
                 rel_matrix_s_mask = lazy_edges[labels]
-            #    edge = edge[:, :, :3]
             elif not bw_01:
                 edge = (edge + 1.0)/2.0
                 rel_matrix_s_mask = edge[edge_mask.bool()]
                 rel_matrix_s_mask = rel_matrix_s_mask.round().int()
 
             if args.evaluate and args.show_tsne:
-                # Vis
-                # edge = edge * model.module.gin_task.ex2alpha.weight.data[..., None] 
+                # Visualize
                 rel_matrix_mask = edge[edge_mask.bool()]
                 subset_rel = torch.randperm(rel_matrix_mask.shape[0])[:1500]
                 rel_matrix_s_np = tsne_wrap(rel_matrix_mask[subset_rel], 2)
@@ -526,8 +501,7 @@ def edge_dist_fast(loader, model, args, device, bw_01, relId2edgeDist=None, prot
                 vis_edge_tsne(np_mat, labels[subset_rel])
 
             if args.evaluate and args.show_tsne_task:
-                # Vis
-                # edge = edge * model.module.gin_task.ex2alpha.weight.data[..., None] 
+                # Visualize
                 task_matrix = out['gin_output_sum']
                 task_matrix = normalize_embedding(task_matrix)
                 subset_rel = torch.randperm(task_matrix.shape[0])[:1500]
@@ -541,11 +515,9 @@ def edge_dist_fast(loader, model, args, device, bw_01, relId2edgeDist=None, prot
                     task_acc = torch.eq(task_ids, out['task_id_pred']).float().mean()
                     print(f"Acc of task_id {task_acc}")
             
-            # Seems like this vectorized method is same speed as for loop over 25 lol (bottleneck likely model(x))
             edge_mask_b = edge_mask.bool()
             gt_edge_mask = gt_edge[edge_mask_b].unsqueeze(-1)
             task_ids_mask = task_ids.unsqueeze(1).expand(edge_mask.shape)[edge_mask_b].unsqueeze(-1)
-            edge_matrix_comp = torch.cat([rel_matrix_s_mask, task_ids_mask, gt_edge_mask], dim=-1)
             
             uniq_edges_comp, counts = torch.unique(edge_matrix_comp, return_counts=True, dim=0)
             for uniq_edge_comp, count in zip(uniq_edges_comp.tolist(), counts.tolist()):
@@ -564,6 +536,7 @@ def edge_dist_fast(loader, model, args, device, bw_01, relId2edgeDist=None, prot
     return relTaskId2edgeDist, taskId2edgeDist, relId2edgeDist, protos, labels, edge_mask_b, task_ids
 
 def edge_acc_fast(relTaskId2edgeDist, best_config):
+    """Compute the edge accuracy for each task"""
     taskAcc = []
     total_num_edges = 0
     total_correct_edges = 0
@@ -585,26 +558,29 @@ def edge_acc_fast(relTaskId2edgeDist, best_config):
     return acc, taskAcc
 
 def vis_pairwise(pairwise, writer, i):
+    """Visualize the pairwise difference"""
     pairwise = pairwise.clip(max=5)
     pairwise = pairwise / 5
     writer.add_image('pairwise_diff', pairwise, i, dataformats='WC')
 
-def vis_blockdiag(blockdiag, writer, i):    
+def vis_blockdiag(blockdiag, writer, i):
+    """Visualize the block diagonal matrix"""  
     writer.add_image('blockdiag', blockdiag, i, dataformats='WC')
     
-def vis_numobjs(num_objs, writer, i):    
+def vis_numobjs(num_objs, writer, i):
+    """Visualize the number of objects"""
     block = torch.eq(num_objs[None], num_objs[:, None])
     writer.add_image('num_objs_viz', block, i, dataformats='WC')
     
 def vis_edgefeat(edgefeat, writer, i):
+    """Visualize the edge features"""
     edgefeat = edgefeat.sum(dim=1)
     writer.add_image('edgefeat', edgefeat, i, dataformats='WC')
 
 def vis_edge_tsne(edges_np, e_labels, max_label=4):
-    # mpl.rcParams['lines.markersize'] == 6
+    """Visualize the edge features using t-SNE"""
     
     fig = plt.figure()
-    # ax = fig.add_subplot(projection='3d')
     ax = fig.add_subplot()
     e_labels = e_labels.cpu().numpy()
     for i in range(max_label):
@@ -615,6 +591,7 @@ def vis_edge_tsne(edges_np, e_labels, max_label=4):
     plt.show()
 
 def edge_acc(loader, model, writer, edge_configs, data_record, args, device, bw_01, ignore_none=True):
+    """Compute the edge accuracy for each task"""
     start_time = time.time()
     model.eval()
     
@@ -624,9 +601,6 @@ def edge_acc(loader, model, writer, edge_configs, data_record, args, device, bw_
     taskIdPreds = [[] for _ in range(args.total_tasks)]
     taskIdGT = [[] for _ in range(args.total_tasks)]
 
-    # need to concat all the edges together, then run accuracy...
-    # rel_matrix_s_outs = []
-    
     with torch.no_grad():
         for i, (mask_imgs, gt_edges, edge_mask, task_ids, mask_imgs_rand, edge_mask_rand) in enumerate(loader):
             mask_imgs = mask_imgs.detach().to(device)
@@ -636,21 +610,6 @@ def edge_acc(loader, model, writer, edge_configs, data_record, args, device, bw_
             rel_matrix_s, _, _ = model(mask_imgs, None, edge_mask, args.softmax_rel, True)
             
             if rel_matrix_s.size(-1) > 3:
-                # Option 1: Take T-SNE
-                # rel_matrix_s = rel_matrix_s[edge_mask.bool()]
-                # subset_rel = torch.randperm(rel_matrix_s.shape[0])[:1500]
-                # rel_matrix_s = tsne_wrap(rel_matrix_s[subset_rel], 2)
-                # e_labels = gt_edges[edge_mask.bool()][subset_rel]
-                # np_mat = rel_matrix_s
-                
-                # Option 2: Take PCA
-                # pcs = calculate_principal_components(rel_matrix_s[edge_mask.bool()], 3)
-                # rel_matrix_s, _ = pca(rel_matrix_s, 3, pcs)
-                # rel_matrix_s = rel_matrix_s.clip(min=-1.0, max=1.0) # don't clip if only pca
-                # e_labels = gt_edges[edge_mask.bool()]
-                # np_mat = rel_matrix_s[edge_mask.bool()].cpu().numpy()
-
-                # Option 3: Truncate to 3
                 rel_matrix_s = rel_matrix_s[:, :, :3]
             
             if not bw_01:
@@ -695,6 +654,7 @@ def edge_acc(loader, model, writer, edge_configs, data_record, args, device, bw_
     return best_acc, taskIdBestAcc, best_config
 
 def edge_dist(loader, model, writer, data_record, args, device, bw_01):
+    """Compute the edge distribution for each task"""
     model.eval()
     start_time = time.time()
     
@@ -722,6 +682,7 @@ def edge_dist(loader, model, writer, data_record, args, device, bw_01):
     return taskId2edgeDist
 
 def edge_dist_sup(loader, model, writer, data_record, args, device):
+    """Compute the edge distribution for each task using supervision"""
     model.eval()
     start_time = time.time()
     
@@ -743,6 +704,7 @@ def edge_dist_sup(loader, model, writer, data_record, args, device):
     return taskId2edgeDist
 
 def train_sup(loader, model, loss_fn, optimizer, epoch, start_step, writer, data_record, args, device):
+    """Train the model using supervision, for only sanity check"""
     total_sum = acc_sum = loss_sum = 0
     start_time = time.time()
     model.train()
@@ -795,6 +757,7 @@ def train_sup(loader, model, loss_fn, optimizer, epoch, start_step, writer, data
     return i + 1, loss_sum/total_sum, acc_sum/total_sum, time.time() - start_time            
 
 def validate_sup(loader, model, loss_fn, epoch, start_step, writer, data_record, args, device):
+    """Validate the model using supervision, for only sanity check"""
     total_sum = acc_sum = loss_sum = 0
     start_time = time.time()
     model.eval()

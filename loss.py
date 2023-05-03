@@ -12,7 +12,8 @@ from util import *
 class_loss = nn.CrossEntropyLoss(reduction='none')
 
 
-def get_data(inpt, name):
+def get_data(inpt: dict, name: str):
+    """Get data from the input dictionary."""
     if name == "x":
         keys = ["task_ids", "gt_edge", "edge_mask", "edge_mask_neg"]
     elif name == "out":
@@ -21,6 +22,7 @@ def get_data(inpt, name):
     return [inpt[key] if key in inpt else None for key in keys]
 
 def graph_task_loss(args, x, out, step, alphas=None):
+    """Compute the graph task loss."""
     task_ids, gt_edge, edge_mask, edge_mask_neg = get_data(x, "x") 
     logits, gin_output_sum, edge_aug, latent, latent_aug, latent_neg, rel_logprob, rel_prior_logprob = get_data(out, "out") 
     
@@ -37,7 +39,6 @@ def graph_task_loss(args, x, out, step, alphas=None):
         intra_diff_mean, inter_diff_mean, pairwise_diff = intra_inter_loss2(gin_output_sum, task_ids, margin, step)
 
     edge_rep_loss = latent_neg_repel_loss(latent, latent_neg, edge_mask, edge_mask_neg, gt_edge)
-    # edge_rep_loss = latent_repel_loss(latent, edge_mask, gt_edge)
     
     edge_att_loss = torch.tensor(0) 
     if edge_aug is not None:
@@ -81,13 +82,8 @@ def graph_task_loss(args, x, out, step, alphas=None):
     return loss, loss_d, pairwise_diff, block_diag
 
 def intra_inter_loss2(gin_output, task_ids, margin, step):
+    """Compute the intra-inter loss, version 2."""
     task_graph_protos = torch_scatter.scatter(gin_output, task_ids, dim=0, reduce='mean')
-    # task_graph_protos_tgt = torch.tensor( 
-    #     [[-0.1234, -2.3086, -2.1037],
-    #     [-0.5515, -1.3321, -0.6064],
-    #     [-1.6965, -0.4579, -0.4828],
-    #     [-2.1672, -0.3021, -2.1382],
-    #     [-1.1366, -1.4432, -2.2343]], dtype=torch.float32, device=gin_output.device)
       
     rows, cols = torch.triu_indices(task_graph_protos.shape[0], task_graph_protos.shape[0], offset=1)
     task_graph_protos_r = task_graph_protos[rows]
@@ -103,9 +99,7 @@ def intra_inter_loss2(gin_output, task_ids, margin, step):
     pairwise_diff = gin_output[:, None] - gin_output[None]
     pairwise_diff = torch.linalg.norm(pairwise_diff, dim=-1)
 
-
-    # todo: try interleave weight instead of all at once
-    if step % 2 == 0: # likely to improve: use momentum targets and still push away intra?
+    if step % 2 == 0:
         intra_diff_mean = intra_diff_mean.detach()
     else:
         inter_diff_mean = inter_diff_mean.detach()
@@ -113,26 +107,14 @@ def intra_inter_loss2(gin_output, task_ids, margin, step):
     return intra_diff_mean, inter_diff_mean, pairwise_diff
 
 def intra_inter_loss(gin_output, task_ids, margin, step=None):
-    # num tasks is max of task_ids + 1
-    # gin_output is [18x20]
-    
+    """Compute the intra-inter loss, version 1."""
     block_diag = torch.eq(task_ids[None], task_ids[:, None]).float()
     
-    # Deprecated ------
-    # block_diag_s = get_block_diag(gin_output.size(0), task_ids[-1] + 1, device)
-    # sanity = (block_diag - block_diag_s).sum()
-    # print(f'sanity {sanity}')
-    # if not isinstance(task_ids, int):
-    #     B = gin_output.size(0)
-    #     block_diag = get_block_diag(B, task_ids, device)
-    # -----------
-
     pos_cnt = block_diag.sum()
     neg_cnt = task_ids.shape[0] ** 2 - pos_cnt
 
-    pairwise_diff = gin_output[:, None] - gin_output[None] #[B=42, B=42, rel_dim=3]
+    pairwise_diff = gin_output[:, None] - gin_output[None]
     pairwise_diff = pairwise_diff.abs().sum(dim=-1)
-    # pairwise_diff = torch.linalg.norm(pairwise_diff, dim=-1)
 
     intra_diff = pairwise_diff * block_diag
     inter_diff = F.relu(margin - pairwise_diff) * (1 - block_diag)
@@ -143,19 +125,15 @@ def intra_inter_loss(gin_output, task_ids, margin, step=None):
     return intra_diff_mean, inter_diff_mean, pairwise_diff
 
 def edge_attract_loss(edges, edges_aug, edge_mask):
-    diff = (edges - edges_aug).abs() # L1 or BCE loss?
+    """Compute the edge attract loss."""
+    diff = (edges - edges_aug).abs()
     
-    ea_loss = diff[edge_mask.bool()].mean()  # this or third is fastest
-    
-    # masked_diff = diff * edge_mask[:, :, None]
-    # ea_loss2 = masked_diff.mean(dim=2).sum()/edge_mask.sum()
-    
-    # masked_diff = diff * edge_mask[:, :, None]
-    # ea_loss3 = masked_diff.sum()/(edge_mask.sum() * masked_diff.shape[-1])
+    ea_loss = diff[edge_mask.bool()].mean()
 
     return ea_loss
 
 def latent_attract_loss(latent, latent_aug, edge_mask, gt_edges):
+    """Compute the latent attract loss."""
     latent = normalize_embedding(latent[edge_mask.bool()])
     latent_aug = normalize_embedding(latent_aug[edge_mask.bool()])
     
@@ -166,66 +144,51 @@ def latent_attract_loss(latent, latent_aug, edge_mask, gt_edges):
     return ea_loss
 
 def latent_repel_loss(latent, edge_mask, gt_edges):
+    """Compute the latent repel loss."""
     latent = normalize_embedding(latent[edge_mask.bool()])
     
     rows, cols = torch.triu_indices(latent.shape[0], latent.shape[0], offset=1)
     latent_rows = latent[rows]
     latent_cols = latent[cols]
     
-    # gt_edges = gt_edges[edge_mask.bool()]
-    # latent0 = latent[gt_edges == 0]
-    # latent1 = latent[gt_edges == 1]
-    # latent2 = latent[gt_edges == 2]
-    # latent3 = latent[gt_edges == 3]
-    
     pw_dotprod = (latent_rows * latent_cols).sum(dim=-1)
-    er_loss = pw_dotprod.mean() #minimize
+    er_loss = pw_dotprod.mean()
     del pw_dotprod
 
     return er_loss
 
 def latent_neg_repel_loss(latent, latent_neg, edge_mask, edge_mask_neg, gt_edges):
+    """Compute the latent repel loss."""
     er_loss = 0
     latent = normalize_embedding(latent[edge_mask.bool()])
     latent_neg = normalize_embedding(latent_neg[edge_mask_neg.bool()]) #try not .detach() this?
 
-    # pw_dotprod_old = (latent[:, None] * latent_neg[None]).sum(dim=-1)
     pw_dotprod = torch.mm(latent, latent_neg.T)
-    er_loss = pw_dotprod.mean() #minimize
+    er_loss = pw_dotprod.mean()
 
     return er_loss
 
 
 def edge_repel_loss(edges, edge_mask):
-    # either can do EVERY pairwise edge repulsion, or a random 2-pair repulsion
-    
-    # mask for non-edges (2 obj case)
+    """Compute the edge repel loss."""
     edges = edges[edge_mask.bool()]
-    # edges = edges.flatten(0, 1) # [252, 3, 3] -> [736 x 3]
     
     rows, cols = torch.triu_indices(edges.shape[0], edges.shape[0], offset=1)
     edge_rows = edges[rows]
     edge_cols = edges[cols]
-    # bce = ((1 - edge_rows) - edge_cols.detach()).abs() #.pow(2)
     er = 1 - (edge_rows - edge_cols).abs()
-    # bce = F.binary_cross_entropy(1 - edge_rows, edge_cols.detach(), reduction="none") # could also try L2 but seems messy as well
     er_val, _ = er.min(dim=-1)
     er_loss = er_val.mean() 
     
     return er_loss
 
 def edge_neg_repel_loss(edges, edges_neg, edge_mask, edge_mask_neg):
+    """Compute the edge repel loss."""
     edges = edges[edge_mask.bool()]
     edges_neg = edges_neg.detach()[edge_mask_neg.bool()]
-    
-    #debugging
-    
-    # edgesv = edges.round()[:30]
-    # edgesnv = edges_neg.round()[:30]
-    
+
     pairwise_diff = 1 - (edges[:, None] - edges_neg[None]).abs()
     
-    # pwd_loss = pairwise_diff.mean()
     pwd_val, pwd_locs = pairwise_diff.min(dim=-1)
     pwd_loss = pwd_val.mean() 
     
