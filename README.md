@@ -1,6 +1,6 @@
 # ViRel: Unsupervised Visual Relations Discovery with Graph-level Analogy
 
-[Paper](https://arxiv.org/abs/2207.00590) | [Poster](https://github.com/snap-stanford/virel/blob/master/poster.pdf) | [Project page](http://snap.stanford.edu/virel/)
+[Paper](https://arxiv.org/abs/2207.00590) | [Poster](https://github.com/snap-stanford/virel/blob/master/poster.pdf) | [Project Page](http://snap.stanford.edu/virel/)
 
 This is the official repo for [ViRel: Unsupervised Visual Relations Discovery with Graph-level Analogy](https://arxiv.org/abs/2207.00590) (Zeng et al. ICML 2022 Beyond Bayes Workshop). ViRel is a method for unsupervised discovery and learning of visual relations with graph-level analogy.
 
