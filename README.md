@@ -21,8 +21,8 @@ git submodule init; git submodule update
 
 This repository also has the following dependencies:
 
-- `PyTorch <https://pytorch.org/>`_ >= 1.9.1
-- `pytorch-geometric <https://github.com/rusty1s/pytorch_geometric>`__
+- `PyTorch <https://pytorch.org/>` >= 1.9.1
+- `pytorch-geometric <https://github.com/rusty1s/pytorch_geometric>`
 - networkx
 
 The included `environment.yml` file can be used to create a conda environment with all dependencies installed:
@@ -47,3 +47,4 @@ To specify the hyperparameters, pass in the path to the .yaml file config, such 
 ```bash
 python relation_analogy.py --yaml config/main1.yaml
 ```
+The hyperparameters can also be passed in via command line, see `get_default_args` in `args.py` for all possible args to pass in. If an arg is not passed in, the default value will be used in `get_default_args`. Specifying an arg in the .yaml file will take precedence over passing in command line values.
