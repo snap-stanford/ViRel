@@ -22,8 +22,8 @@ git submodule init; git submodule update
 This repository also has the following dependencies:
 
 - `PyTorch <https://pytorch.org/>` >= 1.9.1
-- `pytorch-geometric <https://github.com/rusty1s/pytorch_geometric>`
-- networkx
+- `pytorch-geometric <https://github.com/rusty1s/pytorch_geometric>` >= 2.0.1
+- networkx >= 2.6.3
 
 The included `environment.yml` file can be used to create a conda environment with all dependencies installed:
 
