@@ -51,3 +51,17 @@ python relation_analogy.py --yaml config/main1.yaml
 More example yaml config files can be found in the `config` subdirectory.
 
 The hyperparameters can also be passed in via command line, see `get_default_args` in `args.py` for all possible args to pass in. If an arg is not passed in, the default value will be used in `get_default_args`. Specifying an arg in the .yaml file will take precedence over passing in command line values.
+
+# Citation
+If you find our work and/or our code useful, please cite us via:
+
+```bibtex
+@inproceedings{zeng2022virel,
+      title={ViRel: Unsupervised Visual Relations Discovery with Graph-level Analogy}, 
+      author={Zeng, Daniel and Wu, Tailin and Leskovec, Jure},
+      year={2022},
+      eprint={2207.00590},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
