@@ -1,6 +1,6 @@
 alpha_entr: 0
 assert_max_count: false
-base_log: /dfs/user/dzeng/results/relation_analogy_new
+base_log: <put your log directory>
 canvas_size: 16
 checkpoint_step: best
 cl_weight: 1
