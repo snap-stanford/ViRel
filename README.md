@@ -47,4 +47,6 @@ To specify the hyperparameters, pass in the path to the .yaml file config, such 
 ```bash
 python relation_analogy.py --yaml config/main1.yaml
 ```
+More example yaml config files can be found in the `config` subdirectory.
+
 The hyperparameters can also be passed in via command line, see `get_default_args` in `args.py` for all possible args to pass in. If an arg is not passed in, the default value will be used in `get_default_args`. Specifying an arg in the .yaml file will take precedence over passing in command line values.
