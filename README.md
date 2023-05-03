@@ -32,11 +32,11 @@ conda env create -f environment.yml
 conda activate virel
 ```
 
-# Dataset:
+# Dataset
 The dataset files can be generated using the BabyARC engine in the `BabyARC` submodule.
 A example generated dataset can be downloaded from [here](https://drive.google.com/drive/folders/1i-PvyqCycKpPwrtGmQPFkXv9rFGrzOs9?usp=sharing) for the 3 object, 1 distractor object setting.
 
-# Running:
+# Running
 To run the code, use the following command:
 
 ```bash
